@@ -15,7 +15,26 @@ PFILE="./logfile.txt"
 LOGFILE=$OUTDIR/kernlogparser.logfile
 
 #Timestamp pattern
-TIMESTAMP="[*.*]"
+TIMESTAMP="^\[*.*\]"
+
+AWK_SCRIPT_BACK="\'{ if (NF > 1) { 
+                for (i=1; i<NF;i++) {
+                  printf $i
+                  printf " "
+                }
+                printf "\n"
+              }
+            }\'"
+
+AWK_SCRIPT_FORWARD="\'{ if (NF > 1) { 
+                for (i=NF; i>1;i++) {
+                  printf $i
+                  printf " "
+                }
+                printf "\n"
+              }
+            }\'"
+
 
 #Check if $OUTDIR presents
 [[ ! -d $OUTDIR ]] && mkdir $OUTDIR
@@ -37,12 +56,16 @@ grep $TIMESTAMP $LOGFILE > $OUTDIR/tmp
 [[ -f $OUTDIR/tmp ]] && mv -f $OUTDIR/tmp $LOGFILE
 
 # open updated file, read line by line, filter (remove) timestamp
-# search in kernel directory string messages from log, use symbols : [ ] ( )
-# as separators
-
-# start with full string search if no separators
-# remove values before separator : and between [ ] and ( )
-# search again
+# search in kernel directory string messages from log
+sed -i -e 's/$TIMESTAMP//' $LOGFILE
+while read line; do
+  message=$line
+  result=$(grep -nHIirF -- $message $KERNDIR)
+  while true do
+    [[ $message ]] && message=$(echo $message | awk $AWK_SCRIPT) || break
+    [[ $result ]] && break
+  done
+done < $LOGFILE
 
 # special search for kernel dump, if there is address search function name
 
